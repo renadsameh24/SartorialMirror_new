@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class MediaPipe33_To_J17Mapper1 : MonoBehaviour
 {
+    [Header("Debug")]
+    public bool verboseLogs = false;
+
     [Header("MediaPipe landmark spheres (33) root")]
     public Transform mediaPipeRoot; // parent that contains 33 spheres (spawned at runtime)
 
@@ -36,11 +39,35 @@ public class MediaPipe33_To_J17Mapper1 : MonoBehaviour
 
     private bool targetsReady = false;
 
+    static Transform FindDescendantWithAtLeastChildren(Transform root, int minChildren)
+    {
+        if (!root) return null;
+        if (root.childCount >= minChildren) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var c = FindDescendantWithAtLeastChildren(root.GetChild(i), minChildren);
+            if (c) return c;
+        }
+        return null;
+    }
+
     IEnumerator Start()
     {
         // Wait until user assigns roots
         while (mediaPipeRoot == null || jointRoot == null)
             yield return null;
+
+        // Some scene variants assign a container; pick the first descendant that actually holds 33 spheres.
+        if (mediaPipeRoot.childCount < 33)
+        {
+            var candidate = FindDescendantWithAtLeastChildren(mediaPipeRoot, 33);
+            if (candidate != null && candidate != mediaPipeRoot)
+            {
+                if (verboseLogs)
+                    Debug.Log($"[MediaPipe33_To_J17Mapper] Using descendant '{candidate.name}' as mediaPipeRoot (childCount={candidate.childCount}).", this);
+                mediaPipeRoot = candidate;
+            }
+        }
 
         // Wait until mediapipe spheres are spawned
         while (mediaPipeRoot.childCount < 33)
@@ -94,14 +121,26 @@ public class MediaPipe33_To_J17Mapper1 : MonoBehaviour
                 "[MediaPipe33_To_J17Mapper] Could not find all J_* spheres under jointRoot. " +
                 "Make sure the names match exactly (case-sensitive)."
             );
+            if (verboseLogs && jointRoot != null)
+                Debug.LogWarning($"[MediaPipe33_To_J17Mapper] jointRoot='{jointRoot.name}' childCount={jointRoot.childCount}", this);
+        }
+        else if (verboseLogs)
+        {
+            Debug.Log($"[MediaPipe33_To_J17Mapper] Targets ready. mediaPipeRoot='{mediaPipeRoot?.name}' jointRoot='{jointRoot?.name}'", this);
         }
     }
 
     void LateUpdate()
     {
-        if (!targetsReady) return;
         if (mediaPipeRoot == null || jointRoot == null) return;
         if (mediaPipeRoot.childCount < 33) return;
+
+        // If something changed after Start (scene reload / toggles), recover.
+        if (!targetsReady)
+        {
+            CacheTargetsByName();
+            if (!targetsReady) return;
+        }
 
         // If play mode restarted and cached refs got lost, re-cache
         if (mp[0] == null) CacheMpChildren();
