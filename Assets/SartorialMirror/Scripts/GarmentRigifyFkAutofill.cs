@@ -26,7 +26,7 @@ public sealed class GarmentRigifyFkAutofill : MonoBehaviour
         if (string.IsNullOrEmpty(canonical)) yield break;
         yield return canonical;
         yield return canonical.Replace('.', '_');
-        yield return canonical.Replace('.', "");
+        yield return canonical.Replace(".", "");
     }
 
     static Transform FindBone(Transform root, string boneName)
