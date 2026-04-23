@@ -69,8 +69,13 @@ public sealed class GarmentOnlyPoseDirector : MonoBehaviour
         if (smplAvatarRoot) smplAvatarRoot.SetActive(!garmentOnly);
         if (garmentInstanceRoot) garmentInstanceRoot.SetActive(garmentOnly);
 
-        if (classicMapper) classicMapper.enabled = !garmentOnly;
-        if (flexibleMapper) flexibleMapper.enabled = garmentOnly;
+        // Keep the original SMPL sphere→J_* mapping running at all times.
+        // Disabling it freezes J_* targets, which also freezes garment FK.
+        if (classicMapper) classicMapper.enabled = true;
+
+        // Flexible mapper is optional; if present you can enable it as well,
+        // but never at the expense of freezing the classic pipeline.
+        if (flexibleMapper) flexibleMapper.enabled = garmentOnly || flexibleMapper.enabled;
 
         if (smplFkDriver) smplFkDriver.enabled = !garmentOnly;
         if (garmentFkDriver) garmentFkDriver.enabled = garmentOnly;
