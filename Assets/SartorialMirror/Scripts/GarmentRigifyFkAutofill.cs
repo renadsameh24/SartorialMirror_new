@@ -19,6 +19,10 @@ public sealed class GarmentRigifyFkAutofill : MonoBehaviour
 
     public bool autoWireOnPlay = true;
 
+    [Header("Root follow")]
+    [Tooltip("Off by default: Rigify exports often don't have a stable pelvis/root bone like SMPL. Snapping DEF-spine to J_pelvis can collapse the torso. Enable only if you have a true root/pelvis bone to follow.")]
+    public bool enableRootFollow = false;
+
     [Tooltip("Mecanim often overwrites bone transforms each frame; SMPL FK wins in LateUpdate but a garment Animator can still fight this. Disable garment Animators so script FK matches the SMPL-style drive.")]
     public bool disableGarmentAnimators = true;
 
@@ -85,17 +89,34 @@ public sealed class GarmentRigifyFkAutofill : MonoBehaviour
             }
         }
 
-        var spine = FindBone(garmentArmatureRoot, "DEF-spine");
-        var pelvisS = FindSphere(jointSpheresRoot, "J_pelvis");
-        if (spine && pelvisS)
+        // Root follow is optional; default OFF to avoid torso collapse on Rigify exports.
+        fk.rootBone = null;
+        fk.rootSphere = null;
+        fk.followRootPosition = false;
+        fk.followRootRotation = false;
+
+        if (enableRootFollow)
         {
-            fk.rootBone = spine;
-            fk.rootSphere = pelvisS;
-            fk.followRootPosition = true;
-            fk.followRootRotation = false;
+            // Prefer a true root/pelvis if present; fall back to spine only if you know it's safe.
+            var rootCandidate = FindBone(garmentArmatureRoot, "root")
+                               ?? FindBone(garmentArmatureRoot, "DEF-pelvis")
+                               ?? FindBone(garmentArmatureRoot, "DEF-hips")
+                               ?? FindBone(garmentArmatureRoot, "DEF-spine");
+
+            var pelvisS = FindSphere(jointSpheresRoot, "J_pelvis");
+            if (rootCandidate && pelvisS)
+            {
+                fk.rootBone = rootCandidate;
+                fk.rootSphere = pelvisS;
+                fk.followRootPosition = true;
+                fk.followRootRotation = false;
+                Debug.Log("[GarmentRigifyFkAutofill] Root follow enabled using bone '" + rootCandidate.name + "'.", this);
+            }
+            else
+            {
+                Debug.LogWarning("[GarmentRigifyFkAutofill] Root follow enabled but missing rootCandidate/J_pelvis. bone=" + (rootCandidate != null) + " J_pelvis=" + (pelvisS != null), this);
+            }
         }
-        else
-            Debug.LogWarning("[GarmentRigifyFkAutofill] Root follow not set (need DEF-spine + J_pelvis). Spine=" + (spine != null) + " J_pelvis=" + (pelvisS != null), this);
 
         fk.segments = new[]
         {
